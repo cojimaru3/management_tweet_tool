@@ -1,0 +1,186 @@
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel='stylesheet' href='/static/css/style.css' type='text/css' media='all' />
+  <link href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" rel="stylesheet">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jstimezonedetect/1.0.7/jstz.min.js"></script>
+  <script type="text/javascript">
+    function getDifferenceTime(base_time){
+      const utcDate1 = new Date(base_time);
+      const utcDate2 = Date.now();
+      diff = (utcDate2 - utcDate1)/1000
+      if (diff < 60)
+        return Math.floor(diff) + "秒前"
+      else if (diff < 60 * 60)
+        return Math.floor(diff/60) + "分前"
+      else if (diff < 60 * 60 * 24)
+        return Math.floor(diff/60/60) + "時間前"
+      else if (diff < 60 * 60 * 24 * 7)
+        return Math.floor(diff/60/60/24) + "日前"
+      else
+        zone_name = jstz.determine().name();
+        jpn_time = utcDate1.toLocaleDateString({timeZone: zone_name})
+        return jpn_time
+      }
+
+    $(document).ready(function(){
+      $('.RetweetIcon').on('click', function() {
+            let $btn = $(this);
+            tweet_id = $btn.attr('id')
+            // Likeボタンがonクラス持っていたら
+            if ($btn.hasClass('on')) {
+                $btn.removeClass('on');
+                // 白抜きアイコンに戻す
+                $btn.children("i").attr('class', 'fas fa-retweet RetweetIcon-fa-retweet');
+                console.log(tweet_id)
+                $.ajax({
+                  url: 'retweet',
+                  type:'DELETE',
+                  dataType: 'json',
+                  data : {'tweet_id' : tweet_id},
+                  timeout:3000,
+                }).done(function(data) {
+                  console.log(data)
+                  console.log(data['retweet_count'])
+                  if(data['retweet_count'] != 0)
+                    $btn.children("i").text(data['retweet_count'])
+                  else
+                    $btn.children("i").text("")
+                  }).fail(function(XMLHttpRequest, textStatus, errorThrown) {
+                   
+                })
+            } else {
+                $btn.addClass('on');
+                // ①アイコンを変更する
+                // far fa-heart（白抜きアイコン）
+                // ⇒ fas fa-heart（背景色つきアイコン）
+                // ②アニメーション+アイコン色変更用のheartクラスを付与する
+                $btn.children("i").attr('class', 'fas fa-retweet RetweetIcon-fa-retweet retweet');
+                
+                $.ajax({
+                  url: 'retweet',
+                  type:'POST',
+                  dataType: 'json',
+                  data : {'tweet_id' : tweet_id},
+                  timeout:3000,
+                }).done(function(data) {
+                  console.log(data)
+                  console.log(data['retweet_count'])
+                  $btn.children("i").text(data['retweet_count'])
+                  //$btn.attr('id',data['id'])
+                }).fail(function(XMLHttpRequest, textStatus, errorThrown) {
+                   
+                })
+            }
+        });
+
+        $('.LikesIcon').on('click', function() {
+            let $btn = $(this);
+            tweet_id = $btn.attr('id')
+            // Likeボタンがonクラス持っていたら
+            if ($btn.hasClass('on')) {
+                $btn.removeClass('on');
+                // 白抜きアイコンに戻す
+                $btn.children("i").attr('class', 'far fa-heart LikesIcon-fa-heart');
+                $.ajax({
+                  url: 'favorites',
+                  type:'DELETE',
+                  dataType: 'json',
+                  data : {'tweet_id' : tweet_id},
+                  timeout:3000,
+                }).done(function(data) {
+                  console.log(data)
+                  console.log(data['favorite_count'])
+                  if(data['favorite_count'] != 0)
+                    $btn.children("i").text(data['favorite_count'])
+                  else
+                    $btn.children("i").text("")
+                  
+                }).fail(function(XMLHttpRequest, textStatus, errorThrown) {
+                   
+                })
+            } else {
+                $btn.addClass('on');
+                // ①アイコンを変更する
+                // far fa-heart（白抜きアイコン）
+                // ⇒ fas fa-heart（背景色つきアイコン）
+                // ②アニメーション+アイコン色変更用のheartクラスを付与する
+                $btn.children("i").attr('class', 'fas fa-heart LikesIcon-fa-heart heart');
+                $.ajax({
+                  url: 'favorites',
+                  type:'POST',
+                  dataType: 'json',
+                  data : {'tweet_id' : tweet_id},
+                  timeout:3000,
+                }).done(function(data) {
+                  console.log(data)
+                  console.log(data['favorite_count'])
+                  $btn.children("i").text(data['favorite_count'])
+                }).fail(function(XMLHttpRequest, textStatus, errorThrown) {
+                   
+                })
+            }
+        });
+        $('.FollowIcon').on('click', function() {
+            let $btn = $(this);
+            user_id = $btn.attr('id')
+            // Likeボタンがonクラス持っていたら
+            if ($btn.hasClass('on')) {
+                $btn.removeClass('on');
+                // 白抜きアイコンに戻す
+                $btn.children("i").attr('class', 'fas fa-user-plus FollowIcon-fa-follow');
+                $.ajax({
+                  url: 'friendship',
+                  type:'DELETE',
+                  dataType: 'json',
+                  data : {'user_id' : user_id},
+                  timeout:3000,
+                }).done(function(data) {
+                  console.log(data)
+                  }).fail(function(XMLHttpRequest, textStatus, errorThrown) {
+                   
+                })
+            } else {
+                $btn.addClass('on');
+                // ①アイコンを変更する
+                // far fa-heart（白抜きアイコン）
+                // ⇒ fas fa-heart（背景色つきアイコン）
+                // ②アニメーション+アイコン色変更用のheartクラスを付与する
+                $btn.children("i").attr('class', 'fas fa-user-plus FollowIcon-fa-follow follow');
+                
+                $.ajax({
+                  url: 'friendship',
+                  type:'POST',
+                  dataType: 'json',
+                  data : {'user_id' : user_id},
+                  timeout:3000,
+                }).done(function(data) {
+                  console.log(data)
+                }).fail(function(XMLHttpRequest, textStatus, errorThrown) {
+                   
+                })
+            }
+        });
+    });
+  </script>
+</head>
+<body>
+  <!-- ▼twitter風ここから -->
+  <div class="twitter__container">
+    <!-- タイトル -->
+    <div class="twitter__title">
+      <span class="twitter-logo"></span>
+    </div>
+
+    <!-- ▼タイムラインエリア scrollを外すと高さ固定解除 -->
+    <div class="twitter__contents">
+        {% block content %}
+        <!-- ここにメインコンテンツを書く -->
+        {% endblock %}
+    </div>
+    <!--　▲タイムラインエリア ここまで -->
+  </div>
+  <!--　▲twitter風ここまで -->
+</body>
+</html>
