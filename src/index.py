@@ -1,28 +1,61 @@
 # -*- coding:utf-8 -*-
-from flask import Flask, request, Response, render_template
 import json
 import requests
 import settings
+
+from sessionManager import sessionManager
+from flask import Flask, request, Response, render_template,jsonify
 from requests_oauthlib import OAuth1Session
+from urllib.parse import parse_qsl
 
 app = Flask(__name__)
+session_manager = sessionManager()
+twitter = None
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('signin.html')
+
+@app.route('/signin',methods=["GET"])
+def getSignIn():
+    return render_template('signin.html')
+
+@app.route('/signin',methods=["POST"])
+def postSignIn():
+    consumer_key, consumer_secret = session_manager.getConsumerKey()
+    twitter = OAuth1Session(consumer_key, consumer_secret)
+    endpoint = "https://api.twitter.com/oauth/request_token"
+    oauth_callback = "http://192.168.10.107:5000/main"
+    response = twitter.post(endpoint, params={'oauth_callback':oauth_callback})
+    token_dict = dict(parse_qsl(response.content.decode('utf-8')))
+    authentication_endpoint = "https://api.twitter.com/oauth/authenticate?oauth_token={}".format(token_dict['oauth_token'])
+
+    response = jsonify()
+    response.status_code = 302
+    response.headers['location'] = authentication_endpoint
+    return response
+
+@app.route('/main',methods=["GET"])
+def main():
+    oauth_token = request.values.get('oauth_token','')
+    oauth_verifier = request.values.get('oauth_verifier','')
+    session_manager.generateAccessToken(oauth_token, oauth_verifier)
+    return render_template('main.html')
 
 @app.route('/searchTweet',methods=["POST"])
 def getTweet():
     print('Enter getTweet')
-    data = request.get_data().decode('utf-8')
-    tmp,query = data.split('=')
+    query = request.form["search"]
+    
     q = "q={}".format(query)
     lang = "lang=ja"
     result_type = "result_type=recent"
     count = "count=10"
     entities = "include_entities=true"
 
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
+    consumer_key, consumer_secret, access_token, access_secret = session_manager.getAllKey()
+    global twitter
+    twitter = OAuth1Session(consumer_key, consumer_secret, access_token, access_secret)
     endpoint = "https://api.twitter.com/1.1/search/tweets.json?{}&{}&{}&{}&{}".format(q,lang,result_type,count,entities)
     res = twitter.get(endpoint)
     json_response = res.json()
@@ -56,19 +89,12 @@ def getTweet():
     print("Exit getTweet")
     return render_template('searchTweet.html', tweet_list=tweet_list)
 
-def getStatus(tweet_id):
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
-    endpoint = "https://api.twitter.com/1.1/statuses/lookup.json?id={}".format(tweet_id)
-    res = twitter.get(endpoint)
-    json_res = res.json()
-    return json_res[0]
-
 @app.route('/favorites',methods=["POST"])
 def setFavorites():
     print('Enter setFavorites')
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
     tweet_id = request.form.get('tweet_id')
     endpoint = "https://api.twitter.com/1.1/favorites/create.json?id={}".format(tweet_id)
+    
     print(tweet_id)
     res = twitter.post(endpoint)
     json_res = res.json()
@@ -81,7 +107,6 @@ def setFavorites():
 @app.route('/favorites',methods=["DELETE"])
 def deleteFavorites():
     print('Enter deleteFavorites')
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
     tweet_id = request.form.get('tweet_id')
     endpoint = "https://api.twitter.com/1.1/favorites/destroy.json?id={}".format(tweet_id)
     print(tweet_id)
@@ -96,7 +121,6 @@ def deleteFavorites():
 @app.route('/retweet',methods=["POST"])
 def setRetweet():
     print('Enter setRetweet')
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
     tweet_id = request.form.get('tweet_id')
     endpoint = "https://api.twitter.com/1.1/statuses/retweet/{}.json".format(tweet_id)
     print(endpoint)
@@ -111,7 +135,6 @@ def setRetweet():
 @app.route('/retweet',methods=["DELETE"])
 def deleteRetweet():
     print('Enter deleteRetweet')
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
     tweet_id = request.form.get('tweet_id')
     endpoint = "https://api.twitter.com/1.1/statuses/unretweet/{}.json".format(tweet_id)
     print(endpoint)
@@ -126,7 +149,6 @@ def deleteRetweet():
 @app.route('/friendship',methods=["POST"])
 def setFollow():
     print('Enter setFollow')
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
     user_id = request.form.get('user_id')
     endpoint = "https://api.twitter.com/1.1/friendships/create.json?user_id={}".format(user_id)
     headers={"Content-Type":"application/json"}
@@ -139,7 +161,6 @@ def setFollow():
 @app.route('/friendship',methods=["DELETE"])
 def deleteFollow():
     print('Enter setFollow')
-    twitter = OAuth1Session(settings.CONSUMER_KEY,settings.CONSUMER_SECRET,settings.ACCESS_TOKEN,settings.ACCESS_TOKEN_SECRET)
     user_id = request.form.get('user_id')
     endpoint = "https://api.twitter.com/1.1/friendships/destroy.json?user_id={}".format(user_id)
     headers={"Content-Type":"application/json"}
@@ -148,6 +169,15 @@ def deleteFollow():
     print(json.dumps(json_res,indent=4,sort_keys=True,ensure_ascii=False))
     
     return json_res
+
+def getStatus(tweet_id):
+    endpoint = "https://api.twitter.com/1.1/statuses/lookup.json?id={}".format(tweet_id)
+    res = twitter.get(endpoint)
+    json_res = res.json()
+    print(json_res)
+    return json_res[0]
+
+
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
